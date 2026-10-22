@@ -1,13 +1,18 @@
 import AppKit
 import Foundation
+import QuartzCore
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var statusItem: NSStatusItem!
-    var timer: Timer?
+    var refreshTimer: Timer?
+    var tickerTimer: Timer?
+    var isMenuOpen = false
     let scriptPath: String
 
+    var tickerItems: [String] = []
+    var currentTickerIndex: Int = 0
+
     override init() {
-        // Resolve script path relative to this binary or standard location
         let bundleDir = Bundle.main.bundlePath
         let defaultPath = "/Users/raviteja/Developer/api-usage-widget/swiftbar/api-usage.15m.js"
         if FileManager.default.fileExists(atPath: defaultPath) {
@@ -21,14 +26,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
+            button.wantsLayer = true
             button.title = "⚡️ API Monitor"
         }
 
         refreshData()
 
-        // Auto-refresh every 15 minutes
-        timer = Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
+        // Background data refresh every 15 minutes
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
             self?.refreshData()
+        }
+
+        // Vertical scroll ticker every 3 seconds
+        tickerTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+            self?.scrollNextTickerItem()
         }
     }
 
@@ -37,7 +48,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self = self else { return }
             let output = self.runScript()
             DispatchQueue.main.async {
-                self.updateMenu(with: output)
+                self.updateState(with: output)
             }
         }
     }
@@ -46,7 +57,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let process = Process()
         let pipe = Pipe()
 
-        // Check node binary
         let nodePath = FileManager.default.fileExists(atPath: "/opt/homebrew/bin/node") 
             ? "/opt/homebrew/bin/node" 
             : "/usr/local/bin/node"
@@ -66,21 +76,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func updateMenu(with rawOutput: String) {
+    func updateState(with rawOutput: String) {
         let lines = rawOutput.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        guard let first = lines.first else { return }
+        guard !lines.isEmpty else { return }
 
-        // First line is menu bar status text
-        let titleParts = first.components(separatedBy: "|")
-        let title = titleParts[0].trimmingCharacters(in: .whitespaces)
-        if let button = statusItem.button {
-            button.title = title
+        // Find divider separating ticker headers from dropdown menu
+        var newTickerItems: [String] = []
+        var dropdownStartIndex = 0
+
+        for (index, line) in lines.enumerated() {
+            if line.hasPrefix("---") {
+                dropdownStartIndex = index + 1
+                break
+            }
+            let parts = line.components(separatedBy: "|")
+            let title = parts[0].trimmingCharacters(in: .whitespaces)
+            if !title.isEmpty {
+                newTickerItems.append(title)
+            }
         }
 
+        if !newTickerItems.isEmpty {
+            self.tickerItems = newTickerItems
+            if self.currentTickerIndex >= self.tickerItems.count {
+                self.currentTickerIndex = 0
+            }
+            // Set initial title without animation
+            if let button = statusItem.button, !isMenuOpen {
+                button.title = self.tickerItems[self.currentTickerIndex]
+            }
+        }
+
+        // Build Dropdown Menu
         let menu = NSMenu()
+        menu.delegate = self
         menu.autoenablesItems = false
 
-        for line in lines.dropFirst() {
+        let dropdownLines = lines.dropFirst(dropdownStartIndex)
+        for line in dropdownLines {
             if line.hasPrefix("---") {
                 menu.addItem(NSMenuItem.separator())
                 continue
@@ -136,6 +169,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.menu = menu
     }
 
+    func scrollNextTickerItem() {
+        guard !tickerItems.isEmpty, !isMenuOpen else { return }
+        guard let button = statusItem.button else { return }
+
+        currentTickerIndex = (currentTickerIndex + 1) % tickerItems.count
+        let nextTitle = tickerItems[currentTickerIndex]
+
+        // Native vertical push scroll animation from bottom to top
+        button.wantsLayer = true
+        let transition = CATransition()
+        transition.duration = 0.32
+        transition.type = .push
+        transition.subtype = .fromBottom
+        transition.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+
+        button.layer?.add(transition, forKey: "verticalPushScroll")
+        button.title = nextTitle
+    }
+
+    // MARK: - NSMenuDelegate (Pause animation while menu is open)
+    func menuWillOpen(_ menu: NSMenu) {
+        isMenuOpen = true
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        isMenuOpen = false
+    }
+
+    // MARK: - Actions
     @objc func openURLAction(_ sender: NSMenuItem) {
         if let url = sender.representedObject as? URL {
             NSWorkspace.shared.open(url)

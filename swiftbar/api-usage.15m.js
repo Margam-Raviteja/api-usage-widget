@@ -199,12 +199,10 @@ async function main() {
 
   const items = [openrouter, deepseek, openai, groq, anthropic, gcloud];
 
-  // Pick top balance to show on menu bar header
-  const topActive = items.find(i => i.status === 'ok' && i.detail && i.detail.includes('$')) || items[0];
-  const headerText = topActive ? `⚡️ ${topActive.name}: ${topActive.detail}` : '⚡️ API Monitor';
-
-  // Menu bar title
-  console.log(`${headerText} | dropdown=false`);
+  // Output all enabled providers as rotating ticker headers
+  for (const item of items) {
+    console.log(`⚡️ ${item.name}: ${item.detail} | dropdown=false`);
+  }
   console.log('---');
 
   // Header Title
