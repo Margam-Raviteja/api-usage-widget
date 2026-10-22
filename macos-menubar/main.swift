@@ -37,10 +37,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.refreshData()
         }
 
-        // Vertical scroll ticker every 5 seconds
-        tickerTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        // Vertical scroll ticker every 5 seconds (Endless loop on .common mode)
+        let timer = Timer(timeInterval: 5.0, repeats: true) { [weak self] _ in
             self?.scrollNextTickerItem()
         }
+        RunLoop.main.add(timer, forMode: .common)
+        self.tickerTimer = timer
     }
 
     @objc func refreshData() {
@@ -172,6 +174,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func scrollNextTickerItem() {
         guard !tickerItems.isEmpty, !isMenuOpen else { return }
         guard let button = statusItem.button else { return }
+
+        if tickerItems.count <= 1 {
+            button.title = tickerItems[0]
+            return
+        }
 
         currentTickerIndex = (currentTickerIndex + 1) % tickerItems.count
         let nextTitle = tickerItems[currentTickerIndex]
