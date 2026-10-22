@@ -37,8 +37,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.refreshData()
         }
 
-        // Vertical scroll ticker every 3 seconds
-        tickerTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+        // Vertical scroll ticker every 5 seconds
+        tickerTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             self?.scrollNextTickerItem()
         }
     }
@@ -176,10 +176,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         currentTickerIndex = (currentTickerIndex + 1) % tickerItems.count
         let nextTitle = tickerItems[currentTickerIndex]
 
-        // Native vertical push scroll animation from bottom to top
+        // Native vertical push scroll animation from bottom to top (slow & smooth)
         button.wantsLayer = true
         let transition = CATransition()
-        transition.duration = 0.32
+        transition.duration = 0.58
         transition.type = .push
         transition.subtype = .fromBottom
         transition.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
