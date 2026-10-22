@@ -95,6 +95,34 @@ You will see an ASCII gauge table verifying each provider's status and latency!
 
 ---
 
+## 💻 macOS Menu Bar Monitor
+
+You can monitor your API usage directly in your Mac's top menu bar using either of the following two options:
+
+### Option 1: Standalone Native macOS Menu Bar App (Zero-Install)
+A compiled native Swift menu bar app is ready in the repository:
+1. Launch the app directly from your terminal or Finder:
+   ```bash
+   open /Users/raviteja/Developer/api-usage-widget/macos-menubar/APIMenuBar.app
+   ```
+2. A `⚡️ API Monitor` icon will appear in your Mac's menu bar:
+   - Click it to view real-time status and balances across all 6 providers.
+   - Click any provider to open its web dashboard directly in your browser.
+   - Auto-refreshes every 15 minutes, with instant **Refresh Now** and **Edit Config** buttons.
+
+*(Optional)* To keep it running at Mac login:
+- Go to **System Settings > General > Login Items & Extensions**, and add `APIMenuBar.app`.
+
+### Option 2: SwiftBar / xbar Plugin
+If you use [SwiftBar](https://swiftbar.app/) (`brew install --cask swiftbar`):
+1. Copy or symlink the plugin into your SwiftBar plugins folder:
+   ```bash
+   ln -s /Users/raviteja/Developer/api-usage-widget/swiftbar/api-usage.15m.js ~/Library/Application\ Support/SwiftBar/Plugins/
+   ```
+2. SwiftBar will immediately render the live ticker and dropdown menu in your menu bar.
+
+---
+
 ## 📲 Adding the Widget to your Home Screen
 
 1. On your iPhone home screen, long press any empty area until icons jiggle.
