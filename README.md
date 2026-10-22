@@ -11,7 +11,7 @@ A high-performance, dark-themed iOS Home Screen widget built with **Scriptable**
 | **OpenRouter** | Real-time dollar balance & total usage | OpenRouter API Key (`sk-or-v1-...`) |
 | **DeepSeek** | Live USD/CNY balance & credit grants | DeepSeek API Key (`sk-...`) |
 | **OpenAI** | Month-to-date spend (Admin key) or key health & budget | OpenAI Admin or Standard API Key |
-| **Groq** | Active models & real-time RPM/TPM rate-limits | Groq API Key (`gsk_...`) |
+| **Grok** | Active connection & model readiness (xAI) | Grok API Key (`xai-...`) |
 | **Anthropic** | Model access, connection health & budget | Anthropic API Key (`sk-ant-...`) |
 | **Google Cloud / Gemini** | Gemini 1.5/2.0 API quota & Cloud billing credits | Gemini API Key or Cloud budget endpoint |
 
@@ -148,7 +148,7 @@ If you use [SwiftBar](https://swiftbar.app/) (`brew install --cask swiftbar`):
 | `deepseek.apiKey` | string | DeepSeek API Key |
 | `openai.apiKey` | string | OpenAI API Key (`sk-admin-...` for costs, or standard key) |
 | `openai.monthlyBudget` | number | Monthly target budget in USD (default: `50.0`) |
-| `groq.apiKey` | string | Groq API Key |
+| `grok.apiKey` | string | Grok (xAI) API Key (`xai-...`) |
 | `anthropic.apiKey` | string | Anthropic API Key |
 | `googleCloud.geminiApiKey` | string | Google AI Studio Gemini API Key |
 | `googleCloud.cloudCreditsTotal`| number | Total Cloud credits (e.g. `300.0` for trial) |

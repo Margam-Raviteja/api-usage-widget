@@ -4,7 +4,7 @@
  * <xbar.title>AI & Cloud API Usage Monitor</xbar.title>
  * <xbar.version>v1.0</xbar.version>
  * <xbar.author>Margam Ravi Teja</xbar.author>
- * <xbar.desc>Monitors API balances and quota for OpenRouter, DeepSeek, OpenAI, Groq, Anthropic, and Google Cloud</xbar.desc>
+ * <xbar.desc>Monitors API balances and quota for OpenRouter, DeepSeek, OpenAI, Grok (xAI), Anthropic, and Google Cloud</xbar.desc>
  * <xbar.dependencies>node</xbar.dependencies>
  * <swiftbar.hideAbout>true</swiftbar.hideAbout>
  * <swiftbar.hideRunInTerminal>true</swiftbar.hideRunInTerminal>
@@ -16,6 +16,7 @@ const path = require('path');
 const repoDir = path.resolve(__dirname, '..');
 const configPath = path.join(repoDir, 'config.json');
 const fallbackPath = path.join(repoDir, 'config.example.json');
+const ICONS_DIR = path.join(repoDir, 'assets', 'icons');
 
 let config = {};
 if (fs.existsSync(configPath)) {
@@ -29,6 +30,16 @@ if (fs.existsSync(configPath)) {
 }
 
 const timeoutMs = config.timeoutMs || 5000;
+
+function getBase64(iconName) {
+  try {
+    const p = path.join(ICONS_DIR, `${iconName}.png`);
+    if (fs.existsSync(p)) {
+      return fs.readFileSync(p).toString('base64');
+    }
+  } catch (e) {}
+  return '';
+}
 
 async function fetchWithTimeout(url, options = {}, timeout = 5000) {
   const controller = new AbortController();
@@ -45,7 +56,7 @@ async function fetchWithTimeout(url, options = {}, timeout = 5000) {
 
 async function getOpenRouter(cfg) {
   if (!cfg?.apiKey || cfg.apiKey.includes('YOUR_')) {
-    return { name: cfg?.name || 'OpenRouter', status: 'unset', detail: 'Unset', url: 'https://openrouter.ai/keys' };
+    return { id: 'openrouter', name: cfg?.name || 'OpenRouter', status: 'unset', detail: 'Unset', url: 'https://openrouter.ai/keys' };
   }
   try {
     const res = await fetchWithTimeout('https://openrouter.ai/api/v1/credits', {
@@ -57,6 +68,7 @@ async function getOpenRouter(cfg) {
       const used = parseFloat(data.data.total_usage) || 0;
       const left = Math.max(0, total - used);
       return {
+        id: 'openrouter',
         name: cfg.name,
         status: left < 1.0 ? 'warning' : 'ok',
         balance: left,
@@ -68,12 +80,12 @@ async function getOpenRouter(cfg) {
       };
     }
   } catch (e) {}
-  return { name: cfg.name, status: 'error', detail: 'Error', url: 'https://openrouter.ai/credits' };
+  return { id: 'openrouter', name: cfg.name, status: 'error', detail: 'Error', url: 'https://openrouter.ai/credits' };
 }
 
 async function getDeepSeek(cfg) {
   if (!cfg?.apiKey || cfg.apiKey.includes('YOUR_')) {
-    return { name: cfg?.name || 'DeepSeek', status: 'unset', detail: 'Unset', url: 'https://platform.deepseek.com/' };
+    return { id: 'deepseek', name: cfg?.name || 'DeepSeek', status: 'unset', detail: 'Unset', url: 'https://platform.deepseek.com/' };
   }
   try {
     const res = await fetchWithTimeout('https://api.deepseek.com/user/balance', {
@@ -81,9 +93,10 @@ async function getDeepSeek(cfg) {
     }, timeoutMs);
     const data = await res.json();
     if (data?.is_available && Array.isArray(data.balance_infos)) {
-      const usd = data.balance_infos.find(b => b.currency === 'USD') || data.balance_infos[0];
+      const usd = data.balance_infos.find(b => b.currency === "USD") || data.balance_infos[0];
       const bal = parseFloat(usd.total_balance) || 0;
       return {
+        id: 'deepseek',
         name: cfg.name,
         status: bal < 1.0 ? 'warning' : 'ok',
         balance: bal,
@@ -94,12 +107,12 @@ async function getDeepSeek(cfg) {
       };
     }
   } catch (e) {}
-  return { name: cfg.name, status: 'error', detail: 'Error', url: 'https://platform.deepseek.com/' };
+  return { id: 'deepseek', name: cfg.name, status: 'error', detail: 'Error', url: 'https://platform.deepseek.com/' };
 }
 
 async function getOpenAI(cfg) {
   if (!cfg?.apiKey || cfg.apiKey.includes('YOUR_')) {
-    return { name: cfg?.name || 'OpenAI', status: 'unset', detail: 'Unset', url: 'https://platform.openai.com/usage' };
+    return { id: 'openai', name: cfg?.name || 'OpenAI', status: 'unset', detail: 'Unset', url: 'https://platform.openai.com/usage' };
   }
   const budget = cfg.monthlyBudget || 50;
   if (cfg.apiKey.startsWith('sk-admin-')) {
@@ -119,6 +132,7 @@ async function getOpenAI(cfg) {
         for (const i of data.data) total += i.amount?.value || 0;
         const left = Math.max(0, budget - total);
         return {
+          id: 'openai',
           name: cfg.name,
           status: left < 5 ? 'warning' : 'ok',
           detail: `$${total.toFixed(2)} spent`,
@@ -131,6 +145,7 @@ async function getOpenAI(cfg) {
     } catch (e) {}
   }
   return {
+    id: 'openai',
     name: cfg.name,
     status: 'ok',
     detail: 'Active (Key OK)',
@@ -140,25 +155,37 @@ async function getOpenAI(cfg) {
   };
 }
 
-async function getGroq(cfg) {
-  if (!cfg?.apiKey || cfg.apiKey.includes('YOUR_')) {
-    return { name: cfg?.name || 'Groq', status: 'unset', detail: 'Unset', url: 'https://console.groq.com/' };
+async function getGrok(cfg) {
+  const c = cfg || config.grok || config.groq;
+  if (!c?.apiKey || c.apiKey.includes('YOUR_')) {
+    return { id: 'grok', name: c?.name || 'Grok', status: 'unset', detail: 'Unset', url: 'https://console.x.ai/' };
   }
-  return {
-    name: cfg.name,
-    status: 'ok',
-    detail: 'Active (Key OK)',
-    sub: 'Models ready',
-    url: 'https://console.groq.com/',
-    color: '#F55036'
-  };
+  try {
+    const res = await fetchWithTimeout('https://api.x.ai/v1/models', {
+      headers: { Authorization: `Bearer ${c.apiKey}` }
+    }, timeoutMs);
+    const data = await res.json();
+    if (Array.isArray(data?.data)) {
+      return {
+        id: 'grok',
+        name: c.name || 'Grok',
+        status: 'ok',
+        detail: 'Active (Key OK)',
+        sub: `${data.data.length} models ready`,
+        url: 'https://console.x.ai/',
+        color: '#FFFFFF'
+      };
+    }
+  } catch (e) {}
+  return { id: 'grok', name: c?.name || 'Grok', status: 'error', detail: 'Error', url: 'https://console.x.ai/' };
 }
 
 async function getAnthropic(cfg) {
   if (!cfg?.apiKey || cfg.apiKey.includes('YOUR_')) {
-    return { name: cfg?.name || 'Anthropic', status: 'unset', detail: 'Unset', url: 'https://console.anthropic.com/' };
+    return { id: 'anthropic', name: cfg?.name || 'Anthropic', status: 'unset', detail: 'Unset', url: 'https://console.anthropic.com/' };
   }
   return {
+    id: 'anthropic',
     name: cfg.name,
     status: 'ok',
     detail: 'Active (Key OK)',
@@ -172,6 +199,7 @@ async function getGoogleCloud(cfg) {
   const total = cfg?.cloudCreditsTotal || 300;
   const rem = typeof cfg?.cloudCreditsRemaining === 'number' ? cfg.cloudCreditsRemaining : total;
   return {
+    id: 'googlecloud',
     name: cfg?.name || 'Google Cloud',
     status: 'ok',
     detail: `$${rem.toFixed(2)} credits`,
@@ -188,25 +216,28 @@ function renderGauge(pct, len = 8) {
 }
 
 async function main() {
-  const [openrouter, deepseek, openai, groq, anthropic, gcloud] = await Promise.all([
+  const [openrouter, deepseek, openai, grok, anthropic, gcloud] = await Promise.all([
     getOpenRouter(config.openrouter),
     getDeepSeek(config.deepseek),
     getOpenAI(config.openai),
-    getGroq(config.groq),
+    getGrok(config.grok || config.groq),
     getAnthropic(config.anthropic),
     getGoogleCloud(config.googleCloud)
   ]);
 
-  const items = [openrouter, deepseek, openai, groq, anthropic, gcloud];
+  const items = [openrouter, deepseek, openai, grok, anthropic, gcloud];
 
-  // Output all enabled providers as rotating ticker headers
+  // Output all enabled providers as rotating ticker headers (with official logos, no spark)
   for (const item of items) {
-    console.log(`⚡️ ${item.name}: ${item.detail} | dropdown=false`);
+    const iconName = item.id || 'openai';
+    const b64 = getBase64(iconName);
+    const imgParam = b64 ? ` | image=${b64}` : '';
+    console.log(`${item.name}: ${item.detail} | dropdown=false | icon=${iconName}${imgParam}`);
   }
   console.log('---');
 
   // Header Title
-  console.log('⚡️ AI & Cloud API Monitor | size=14 font=Menlo-Bold');
+  console.log('AI & Cloud API Monitor | size=14 font=Menlo-Bold');
   const now = new Date();
   const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   console.log(`Last updated: ${timeStr} | size=10 color=#888888`);
@@ -214,9 +245,11 @@ async function main() {
 
   // Provider entries
   for (const item of items) {
-    const icon = item.status === 'ok' ? '🟢' : (item.status === 'warning' ? '🟡' : (item.status === 'unset' ? '⚪️' : '🔴'));
+    const iconName = item.id || 'openai';
+    const b64 = getBase64(iconName);
+    const imgParam = b64 ? ` | image=${b64}` : '';
     const gauge = renderGauge(item.percent);
-    const line = `${icon} ${item.name}: ${item.detail} ${gauge} | href=${item.url} font=Menlo-Regular`;
+    const line = `${item.name}: ${item.detail} ${gauge} | href=${item.url} | font=Menlo-Regular | icon=${iconName}${imgParam}`;
     console.log(line);
     if (item.sub) {
       console.log(`-- ${item.sub} | size=11 color=#888888`);
@@ -230,7 +263,7 @@ async function main() {
 }
 
 main().catch(err => {
-  console.log('⚡️ API Monitor: Error | dropdown=false');
+  console.log('API Monitor: Error | dropdown=false');
   console.log('---');
   console.log(`Error: ${err.message}`);
   console.log('🔄 Refresh | refresh=true');

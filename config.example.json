@@ -18,10 +18,10 @@
     "monthlyBudget": 50.0,
     "name": "OpenAI"
   },
-  "groq": {
+  "grok": {
     "enabled": true,
-    "apiKey": "gsk_YOUR_GROQ_API_KEY",
-    "name": "Groq"
+    "apiKey": "xai-YOUR_GROK_API_KEY",
+    "name": "Grok"
   },
   "anthropic": {
     "enabled": true,

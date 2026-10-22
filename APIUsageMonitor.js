@@ -51,11 +51,11 @@ const DEFAULT_CONFIG = {
     name: "OpenAI"
   },
 
-  // 4. Groq (https://console.groq.com/keys)
-  groq: {
+  // 4. Grok (https://console.x.ai/)
+  grok: {
     enabled: true,
-    apiKey: "", // e.g. "gsk_..."
-    name: "Groq"
+    apiKey: "", // e.g. "xai-..."
+    name: "Grok"
   },
 
   // 5. Anthropic (https://console.anthropic.com/settings/keys)
@@ -342,57 +342,45 @@ async function fetchOpenAI(cfg, timeoutMs) {
 }
 
 /**
- * Groq Adapter
- * Queries /openai/v1/models to verify key & inspect rate limits
+ * Grok (xAI) Adapter
+ * Queries /v1/models to verify key & model readiness
  */
-async function fetchGroq(cfg, timeoutMs) {
+async function fetchGrok(cfg, timeoutMs) {
   if (!cfg.apiKey) {
-    return { id: "groq", name: cfg.name, status: "unconfigured", detail: "No API Key", subDetail: "Configure key", percent: null, color: "#F05A28" };
+    return { id: "grok", name: cfg.name || "Grok", status: "unconfigured", detail: "No API Key", subDetail: "Configure key", percent: null, color: "#FFFFFF" };
   }
 
   try {
-    const req = new Request("https://api.groq.com/openai/v1/models");
+    const req = new Request("https://api.x.ai/v1/models");
     req.headers = { Authorization: `Bearer ${cfg.apiKey}` };
     req.timeoutInterval = timeoutMs / 1000;
     const res = await req.loadJSON();
 
     if (res && Array.isArray(res.data)) {
-      // In Scriptable req.response headers might have rate-limit details
-      let detail = "Active (Key OK)";
-      let subDetail = `${res.data.length} models ready`;
-      let percent = 100;
-
-      if (req.response && req.response.headers) {
-        const h = req.response.headers;
-        const remTokens = h["x-ratelimit-remaining-tokens"];
-        const limitTokens = h["x-ratelimit-limit-tokens"];
-        if (remTokens && limitTokens && parseInt(limitTokens) > 0) {
-          percent = Math.round((parseInt(remTokens) / parseInt(limitTokens)) * 100);
-          detail = `${percent}% RPM left`;
-          subDetail = `${Math.round(parseInt(remTokens) / 1000)}k tokens remaining`;
-        }
-      }
-
       return {
-        id: "groq",
-        name: cfg.name,
+        id: "grok",
+        name: cfg.name || "Grok",
         status: "ok",
-        detail: detail,
-        subDetail: subDetail,
-        percent: percent,
-        icon: "speedometer",
-        color: "#F55036" // Groq orange
+        detail: "Active (Key OK)",
+        subDetail: `${res.data.length} models ready`,
+        percent: 100,
+        icon: "bolt.fill",
+        color: "#FFFFFF"
       };
     }
     throw new Error(res.error?.message || "Invalid response");
   } catch (err) {
     return {
-      id: "groq",
-      name: cfg.name,
+      id: "grok",
+      name: cfg.name || "Grok",
       status: "error",
       detail: "Check Key",
       subDetail: String(err.message || err).slice(0, 20),
-      icon: "speedometer",
+      icon: "bolt.fill",
+      color: "#FFFFFF"
+    };
+  }
+}
       color: "#F55036"
     };
   }
@@ -543,7 +531,7 @@ async function fetchAllProviders(config) {
   if (config.openrouter?.enabled) tasks.push(fetchOpenRouter(config.openrouter, timeoutMs));
   if (config.deepseek?.enabled) tasks.push(fetchDeepSeek(config.deepseek, timeoutMs));
   if (config.openai?.enabled) tasks.push(fetchOpenAI(config.openai, timeoutMs));
-  if (config.groq?.enabled) tasks.push(fetchGroq(config.groq, timeoutMs));
+  if (config.grok?.enabled || config.groq?.enabled) tasks.push(fetchGrok(config.grok || config.groq, timeoutMs));
   if (config.anthropic?.enabled) tasks.push(fetchAnthropic(config.anthropic, timeoutMs));
   if (config.googleCloud?.enabled) tasks.push(fetchGoogleCloud(config.googleCloud, timeoutMs));
 

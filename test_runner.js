@@ -148,31 +148,27 @@ async function testOpenAI(cfg) {
   }
 }
 
-async function testGroq(cfg) {
+async function testGrok(cfg) {
   if (!cfg?.apiKey || cfg.apiKey.includes("YOUR_")) {
-    return { name: cfg?.name || "Groq", status: "unconfigured", detail: "No API Key", sub: "Set apiKey" };
+    return { name: cfg?.name || "Grok", status: "unconfigured", detail: "No API Key", sub: "Set apiKey" };
   }
   try {
-    const res = await fetchWithTimeout("https://api.groq.com/openai/v1/models", {
+    const res = await fetchWithTimeout("https://api.x.ai/v1/models", {
       headers: { Authorization: `Bearer ${cfg.apiKey}` }
     }, timeoutMs);
     const data = await res.json();
     if (data && Array.isArray(data.data)) {
-      const rem = res.headers.get("x-ratelimit-remaining-tokens");
-      const lim = res.headers.get("x-ratelimit-limit-tokens");
-      let detail = "Active (Key OK)";
-      let sub = `${data.length} models ready`;
-      let pct = 100;
-      if (rem && lim && parseInt(lim) > 0) {
-        pct = Math.round((parseInt(rem) / parseInt(lim)) * 100);
-        detail = `${pct}% RPM left`;
-        sub = `${Math.round(parseInt(rem) / 1000)}k tokens remaining`;
-      }
-      return { name: cfg.name, status: "ok", detail, sub, percent: pct };
+      return {
+        name: cfg.name || "Grok",
+        status: "ok",
+        detail: "Active (Key OK)",
+        sub: `${data.data.length} models ready`,
+        percent: 100
+      };
     }
     throw new Error(data.error?.message || "Invalid response");
   } catch (e) {
-    return { name: cfg.name, status: "error", detail: "Error", sub: e.message.slice(0, 30) };
+    return { name: cfg.name || "Grok", status: "error", detail: "Error", sub: e.message.slice(0, 30) };
   }
 }
 
@@ -260,7 +256,7 @@ async function main() {
     testOpenRouter(config.openrouter),
     testDeepSeek(config.deepseek),
     testOpenAI(config.openai),
-    testGroq(config.groq),
+    testGrok(config.grok || config.groq),
     testAnthropic(config.anthropic),
     testGoogleCloud(config.googleCloud)
   ]);
