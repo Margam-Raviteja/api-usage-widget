@@ -45,19 +45,6 @@ async function fetchWithTimeout(url, options = {}, timeout = 5000) {
 
 async function getOpenRouter(cfg) {
   if (!cfg?.apiKey || cfg.apiKey.includes('YOUR_')) {
-    if (typeof cfg?.credits === 'number' || typeof cfg?.creditsRemaining === 'number') {
-      const cred = typeof cfg.credits === 'number' ? cfg.credits : cfg.creditsRemaining;
-      return {
-        name: cfg?.name || 'OpenRouter',
-        status: 'ok',
-        balance: cred,
-        detail: `$${cred.toFixed(2)} left`,
-        sub: 'Prepaid credits',
-        percent: 75,
-        url: 'https://openrouter.ai/credits',
-        color: '#A855F7'
-      };
-    }
     return { name: cfg?.name || 'OpenRouter', status: 'unset', detail: 'Unset', url: 'https://openrouter.ai/keys' };
   }
   try {
@@ -86,19 +73,6 @@ async function getOpenRouter(cfg) {
 
 async function getDeepSeek(cfg) {
   if (!cfg?.apiKey || cfg.apiKey.includes('YOUR_')) {
-    if (typeof cfg?.balance === 'number' || typeof cfg?.credits === 'number') {
-      const bal = typeof cfg.balance === 'number' ? cfg.balance : cfg.credits;
-      return {
-        name: cfg?.name || 'DeepSeek',
-        status: 'ok',
-        balance: bal,
-        detail: `$${bal.toFixed(2)} left`,
-        sub: 'Active balance',
-        percent: 65,
-        url: 'https://platform.deepseek.com/top_up',
-        color: '#0EA5E9'
-      };
-    }
     return { name: cfg?.name || 'DeepSeek', status: 'unset', detail: 'Unset', url: 'https://platform.deepseek.com/' };
   }
   try {
@@ -225,16 +199,8 @@ async function main() {
 
   const items = [openrouter, deepseek, openai, groq, anthropic, gcloud];
 
-  // Output ONLY providers with active credits / balances in ticker
-  const providersWithCredits = items.filter(item => {
-    if (!item || item.status === 'unset' || item.status === 'error') return false;
-    const d = (item.detail || '').toLowerCase();
-    return d.includes('$') || d.includes('¥') || d.includes('credit') || (item.balance !== undefined && item.balance !== null);
-  });
-
-  const tickerItems = providersWithCredits.length > 0 ? providersWithCredits : items;
-
-  for (const item of tickerItems) {
+  // Output all enabled providers as rotating ticker headers
+  for (const item of items) {
     console.log(`⚡️ ${item.name}: ${item.detail} | dropdown=false`);
   }
   console.log('---');
