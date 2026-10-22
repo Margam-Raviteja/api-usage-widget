@@ -1,0 +1,11 @@
+# API credentials & config with personal keys
+config.json
+api-usage-config.json
+api-usage-cache.json
+
+# Dependencies
+node_modules/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
