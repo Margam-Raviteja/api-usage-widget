@@ -381,10 +381,6 @@ async function fetchGrok(cfg, timeoutMs) {
     };
   }
 }
-      color: "#F55036"
-    };
-  }
-}
 
 /**
  * Anthropic Adapter
