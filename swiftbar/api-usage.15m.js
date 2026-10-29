@@ -144,12 +144,30 @@ async function getOpenAI(cfg) {
       }
     } catch (e) {}
   }
+  // Standard API key validation
+  try {
+    const res = await fetchWithTimeout('https://api.openai.com/v1/models', {
+      headers: { Authorization: `Bearer ${cfg.apiKey}` }
+    }, timeoutMs);
+    const data = await res.json();
+    if (Array.isArray(data?.data)) {
+      return {
+        id: 'openai',
+        name: cfg.name,
+        status: 'ok',
+        detail: 'Active (Key OK)',
+        sub: `Budget: $${budget}/mo`,
+        url: 'https://platform.openai.com/usage',
+        color: '#10A37F'
+      };
+    }
+  } catch (e) {}
   return {
     id: 'openai',
     name: cfg.name,
-    status: 'ok',
-    detail: 'Active (Key OK)',
-    sub: `Budget: $${budget}/mo`,
+    status: 'error',
+    detail: 'Invalid Key',
+    sub: 'Check apiKey',
     url: 'https://platform.openai.com/usage',
     color: '#10A37F'
   };
@@ -184,12 +202,33 @@ async function getAnthropic(cfg) {
   if (!cfg?.apiKey || cfg.apiKey.includes('YOUR_')) {
     return { id: 'anthropic', name: cfg?.name || 'Anthropic', status: 'unset', detail: 'Unset', url: 'https://console.anthropic.com/' };
   }
+  const budget = cfg.monthlyBudget || 50;
+  try {
+    const res = await fetchWithTimeout('https://api.anthropic.com/v1/models', {
+      headers: {
+        'x-api-key': cfg.apiKey,
+        'anthropic-version': '2023-06-01'
+      }
+    }, timeoutMs);
+    const data = await res.json();
+    if (Array.isArray(data?.data)) {
+      return {
+        id: 'anthropic',
+        name: cfg.name,
+        status: 'ok',
+        detail: 'Active (Key OK)',
+        sub: `Budget: $${budget}/mo`,
+        url: 'https://console.anthropic.com/',
+        color: '#CC785C'
+      };
+    }
+  } catch (e) {}
   return {
     id: 'anthropic',
     name: cfg.name,
-    status: 'ok',
-    detail: 'Active (Key OK)',
-    sub: `Budget: $${cfg.monthlyBudget || 50}/mo`,
+    status: 'error',
+    detail: 'Check Key',
+    sub: 'Connection Error',
     url: 'https://console.anthropic.com/',
     color: '#CC785C'
   };
@@ -198,11 +237,48 @@ async function getAnthropic(cfg) {
 async function getGoogleCloud(cfg) {
   const total = cfg?.cloudCreditsTotal || 300;
   const rem = typeof cfg?.cloudCreditsRemaining === 'number' ? cfg.cloudCreditsRemaining : total;
+  const isKeyUnset = !cfg?.geminiApiKey || cfg.geminiApiKey.includes('YOUR_');
+
+  if (isKeyUnset) {
+    const isBudgetConfigured = Boolean(cfg?.cloudCreditsTotal);
+    return {
+      id: 'googlecloud',
+      name: cfg?.name || 'Google Cloud',
+      status: isBudgetConfigured ? 'ok' : 'unset',
+      detail: `$${rem.toFixed(2)} credits`,
+      sub: `Budget: $${total.toFixed(0)}`,
+      url: 'https://console.cloud.google.com/billing',
+      color: '#4285F4'
+    };
+  }
+
+  // Validate Gemini API Key if provided
+  try {
+    const res = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${cfg.geminiApiKey}`,
+      {},
+      timeoutMs
+    );
+    const data = await res.json();
+    if (Array.isArray(data?.models)) {
+      return {
+        id: 'googlecloud',
+        name: cfg?.name || 'Google Cloud',
+        status: rem < 25 ? 'warning' : 'ok',
+        detail: `$${rem.toFixed(2)} credits`,
+        sub: 'Gemini Key Active',
+        percent: Math.round((rem / total) * 100),
+        url: 'https://console.cloud.google.com/billing',
+        color: '#4285F4'
+      };
+    }
+  } catch (e) {}
+
   return {
     id: 'googlecloud',
     name: cfg?.name || 'Google Cloud',
-    status: 'ok',
-    detail: `$${rem.toFixed(2)} credits`,
+    status: 'error',
+    detail: 'Gemini Error',
     sub: `Budget: $${total.toFixed(0)}`,
     url: 'https://console.cloud.google.com/billing',
     color: '#4285F4'
@@ -227,8 +303,13 @@ async function main() {
 
   const items = [openrouter, deepseek, openai, grok, anthropic, gcloud];
 
-  // Output all enabled providers as rotating ticker headers (with official logos, no spark)
-  for (const item of items) {
+  // Output configured/active providers as rotating ticker headers (with official logos)
+  const activeItems = items.filter(item => item && item.status !== 'unset');
+  const tickerItems = activeItems.length > 0
+    ? activeItems
+    : [{ name: 'API Monitor', detail: 'Setup Keys', id: 'openai' }];
+
+  for (const item of tickerItems) {
     const iconName = item.id || 'openai';
     const b64 = getBase64(iconName);
     const imgParam = b64 ? ` | image=${b64}` : '';

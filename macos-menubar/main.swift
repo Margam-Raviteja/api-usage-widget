@@ -18,14 +18,89 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var tickerItems: [TickerItem] = []
     var currentTickerIndex: Int = 0
 
-    override init() {
-        let bundleDir = Bundle.main.bundlePath
-        let defaultPath = "/Users/raviteja/Developer/api-usage-widget/swiftbar/api-usage.15m.js"
-        if FileManager.default.fileExists(atPath: defaultPath) {
-            self.scriptPath = defaultPath
-        } else {
-            self.scriptPath = "\(bundleDir)/../swiftbar/api-usage.15m.js"
+    static func resolveScriptPath() -> String {
+        let bundleURL = Bundle.main.bundleURL
+        // Candidate 1: relative to APIMenuBar.app bundle (repo/macos-menubar/APIMenuBar.app -> repo/swiftbar/api-usage.15m.js)
+        let repoCandidate = bundleURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("swiftbar/api-usage.15m.js")
+            .standardized.path
+        if FileManager.default.fileExists(atPath: repoCandidate) {
+            return repoCandidate
         }
+
+        // Candidate 2: sibling directory (repo/swiftbar)
+        let siblingCandidate = bundleURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("swiftbar/api-usage.15m.js")
+            .standardized.path
+        if FileManager.default.fileExists(atPath: siblingCandidate) {
+            return siblingCandidate
+        }
+
+        // Candidate 3: Inside bundle Resources
+        if let resPath = Bundle.main.path(forResource: "api-usage.15m", ofType: "js") {
+            return resPath
+        }
+
+        // Fallback to default user path if still present
+        let fallback = "/Users/raviteja/Developer/api-usage-widget/swiftbar/api-usage.15m.js"
+        if FileManager.default.fileExists(atPath: fallback) {
+            return fallback
+        }
+
+        return repoCandidate
+    }
+
+    static func findNodeExecutable() -> String {
+        let fm = FileManager.default
+        let candidates = [
+            "/opt/homebrew/bin/node",
+            "/usr/local/bin/node",
+            "/usr/bin/node",
+            fm.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/node").path,
+            fm.homeDirectoryForCurrentUser.appendingPathComponent(".volta/bin/node").path,
+            fm.homeDirectoryForCurrentUser.appendingPathComponent(".asdf/shims/node").path
+        ]
+        for path in candidates {
+            if fm.isExecutableFile(atPath: path) {
+                return path
+            }
+        }
+
+        // Check ~/.nvm/versions/node
+        let nvmDir = fm.homeDirectoryForCurrentUser.appendingPathComponent(".nvm/versions/node")
+        if let versions = try? fm.contentsOfDirectory(atPath: nvmDir.path).sorted().reversed() {
+            for ver in versions {
+                let nvmNode = nvmDir.appendingPathComponent("\(ver)/bin/node").path
+                if fm.isExecutableFile(atPath: nvmNode) {
+                    return nvmNode
+                }
+            }
+        }
+
+        // Query user's login shell as last resort
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        proc.arguments = ["-ilc", "which node"]
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = Pipe()
+        if (try? proc.run()) != nil {
+            proc.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !output.isEmpty, fm.isExecutableFile(atPath: output) {
+                return output
+            }
+        }
+
+        return "/opt/homebrew/bin/node"
+    }
+
+    override init() {
+        self.scriptPath = AppDelegate.resolveScriptPath()
         super.init()
     }
 
@@ -65,10 +140,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func runScript() -> String {
         let process = Process()
         let pipe = Pipe()
-
-        let nodePath = FileManager.default.fileExists(atPath: "/opt/homebrew/bin/node") 
-            ? "/opt/homebrew/bin/node" 
-            : "/usr/local/bin/node"
+        let nodePath = AppDelegate.findNodeExecutable()
 
         process.executableURL = URL(fileURLWithPath: nodePath)
         process.arguments = [scriptPath]
@@ -93,10 +165,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let name = iconName?.lowercased() ?? ""
         if img == nil && !name.isEmpty {
             let bundle = Bundle.main.bundlePath
+            let repoDir = Bundle.main.bundleURL
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .standardized.path
             let candidates = [
                 "\(bundle)/Contents/Resources/icons/\(name).png",
-                "/Users/raviteja/Developer/api-usage-widget/assets/icons/\(name).png",
-                "/Users/raviteja/Developer/api-usage-widget/assets/icons/original/\(name).png"
+                "\(repoDir)/assets/icons/\(name).png",
+                "\(repoDir)/assets/icons/original/\(name).png",
+                "/Users/raviteja/Developer/api-usage-widget/assets/icons/\(name).png"
             ]
             for path in candidates {
                 if FileManager.default.fileExists(atPath: path), let loadedFromFile = NSImage(contentsOfFile: path) {
@@ -241,6 +318,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func scrollNextTickerItem() {
         guard !tickerItems.isEmpty, !isMenuOpen else { return }
         guard let button = statusItem.button else { return }
+
+        // If there is only 1 item in the ticker, display it steadily without re-triggering animations
+        if tickerItems.count <= 1 {
+            let single = tickerItems[0]
+            button.image = single.image
+            button.imagePosition = .imageLeft
+            button.title = " " + single.title
+            return
+        }
 
         currentTickerIndex = (currentTickerIndex + 1) % tickerItems.count
         let nextItem = tickerItems[currentTickerIndex]
