@@ -14,6 +14,7 @@ A high-performance, dark-themed iOS Home Screen widget built with **Scriptable**
 | **Grok** | Active connection & model readiness (xAI) | Grok API Key (`xai-...`) |
 | **Anthropic** | Model access, connection health & budget | Anthropic API Key (`sk-ant-...`) |
 | **Google Cloud / Gemini** | Gemini 1.5/2.0 API quota & Cloud billing credits | Gemini API Key or Cloud budget endpoint |
+| **Amazon Bedrock** (macOS only) | Active Bedrock-eligible AWS credit balances | Existing AWS CLI profile; no API key stored in the app |
 
 ---
 
@@ -121,6 +122,37 @@ If you use [SwiftBar](https://swiftbar.app/) (`brew install --cask swiftbar`):
    ```
 2. SwiftBar will immediately render the live ticker and dropdown menu in your menu bar.
 
+### Amazon Bedrock credits (macOS menu bar and terminal only)
+
+This feature requires **AWS CLI v2** and an authenticated AWS profile. It uses your existing CLI credentials—do not add AWS access keys or secrets to `config.json`.
+
+Enable it in your local, git-ignored `config.json`:
+
+```json
+"bedrock": {
+  "enabled": true,
+  "awsProfile": "default",
+  "payerAccountFlag": false,
+  "lowBalanceWarning": 10,
+  "name": "Bedrock"
+}
+```
+
+The app calls `sts:GetCallerIdentity` and `billing:GetCredits`, then includes only credits that are enabled, within their validity period, and explicitly list **Amazon Bedrock** in their applicable products. It displays **No credits** when there are no matching credits; it does not guess a balance from Bedrock usage or a manually configured budget.
+
+- Replace `default` with your configured AWS profile name if needed.
+- `accountId` is optional; normally the app discovers it using STS. If supplied, it must be a 12-digit account ID.
+- `consoleUrl` is optional; set it to your account-specific AWS Credits console URL, or omit it to use the generic Credits page.
+- Set `payerAccountFlag` to `true` only when the profile belongs to the management account and you want consolidated billing-family credits.
+- If your role uses temporary credentials, renew its session as usual when it expires.
+- The AWS principal needs read-only `sts:GetCallerIdentity` and `billing:GetCredits` permissions. No Cost Explorer calls or model invocations are made.
+
+AWS may apply shared or broadly scoped credits differently from what a product-name filter indicates. The app intentionally reports only explicitly Bedrock-eligible credits and links to **AWS Billing and Cost Management → Credits** for the authoritative details.
+
+**iOS limitation:** Scriptable cannot access your Mac's AWS CLI credentials, so the iOS widget does not include Bedrock. Keeping AWS credentials on the laptop avoids embedding long-lived AWS secrets in the widget.
+
+Run the adapter tests with `node --test lib/bedrock-credits.test.js`.
+
 ---
 
 ## 📲 Adding the Widget to your Home Screen
@@ -153,3 +185,9 @@ If you use [SwiftBar](https://swiftbar.app/) (`brew install --cask swiftbar`):
 | `googleCloud.geminiApiKey` | string | Google AI Studio Gemini API Key |
 | `googleCloud.cloudCreditsTotal`| number | Total Cloud credits (e.g. `300.0` for trial) |
 | `googleCloud.cloudCreditsRemaining`| number | Remaining Cloud credits balance |
+| `bedrock.enabled` | boolean | Enable the macOS-only AWS Billing credits adapter (default: `false`) |
+| `bedrock.awsProfile` | string | Existing AWS CLI profile to use (default: `default`) |
+| `bedrock.accountId` | string | Optional 12-digit account ID; discovered through STS when omitted |
+| `bedrock.consoleUrl` | string | Optional account-specific AWS Credits console URL for the dropdown link |
+| `bedrock.payerAccountFlag` | boolean | Include consolidated billing-family credits when authorized (default: `false`) |
+| `bedrock.lowBalanceWarning` | number | Remaining-credit threshold for a warning (default: `10`) |

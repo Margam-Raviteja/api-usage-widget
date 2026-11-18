@@ -36,5 +36,14 @@
     "cloudCreditsRemaining": 240.0,
     "billingEndpointUrl": "",
     "name": "Google Cloud"
+  },
+  "bedrock": {
+    "enabled": false,
+    "awsProfile": "default",
+    "accountId": "",
+    "consoleUrl": "",
+    "payerAccountFlag": false,
+    "lowBalanceWarning": 10,
+    "name": "Bedrock"
   }
 }

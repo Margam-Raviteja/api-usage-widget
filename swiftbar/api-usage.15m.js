@@ -4,7 +4,7 @@
  * <xbar.title>AI & Cloud API Usage Monitor</xbar.title>
  * <xbar.version>v1.0</xbar.version>
  * <xbar.author>Margam Ravi Teja</xbar.author>
- * <xbar.desc>Monitors API balances and quota for OpenRouter, DeepSeek, OpenAI, Grok (xAI), Anthropic, and Google Cloud</xbar.desc>
+ * <xbar.desc>Monitors API balances and quota for OpenRouter, DeepSeek, OpenAI, Grok (xAI), Anthropic, Google Cloud, and Amazon Bedrock</xbar.desc>
  * <xbar.dependencies>node</xbar.dependencies>
  * <swiftbar.hideAbout>true</swiftbar.hideAbout>
  * <swiftbar.hideRunInTerminal>true</swiftbar.hideRunInTerminal>
@@ -12,6 +12,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const { fetchBedrockCredits } = require('../lib/bedrock-credits');
+const { getTickerItems } = require('../lib/provider-display');
 
 const repoDir = path.resolve(__dirname, '..');
 const configPath = path.join(repoDir, 'config.json');
@@ -292,22 +294,22 @@ function renderGauge(pct, len = 8) {
 }
 
 async function main() {
-  const [openrouter, deepseek, openai, grok, anthropic, gcloud] = await Promise.all([
+  const [openrouter, deepseek, openai, grok, anthropic, gcloud, bedrock] = await Promise.all([
     getOpenRouter(config.openrouter),
     getDeepSeek(config.deepseek),
     getOpenAI(config.openai),
     getGrok(config.grok || config.groq),
     getAnthropic(config.anthropic),
-    getGoogleCloud(config.googleCloud)
+    getGoogleCloud(config.googleCloud),
+    config.bedrock?.enabled
+      ? fetchBedrockCredits(config.bedrock)
+      : Promise.resolve(null)
   ]);
 
-  const items = [openrouter, deepseek, openai, grok, anthropic, gcloud];
+  const items = [openrouter, deepseek, openai, grok, anthropic, gcloud, bedrock].filter(Boolean);
 
-  // Output configured/active providers as rotating ticker headers (with official logos)
-  const activeItems = items.filter(item => item && item.status !== 'unset');
-  const tickerItems = activeItems.length > 0
-    ? activeItems
-    : [{ name: 'API Monitor', detail: 'Setup Keys', id: 'openai' }];
+  // Keep errors and unconfigured providers in the dropdown, out of the ticker.
+  const tickerItems = getTickerItems(items);
 
   for (const item of tickerItems) {
     const iconName = item.id || 'openai';
@@ -334,6 +336,9 @@ async function main() {
     console.log(line);
     if (item.sub) {
       console.log(`-- ${item.sub} | size=11 color=#888888`);
+    }
+    if (item.expires) {
+      console.log(`-- Next expiration: ${item.expires} | size=11 color=#888888`);
     }
   }
 

@@ -8,6 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { fetchBedrockCredits } = require('./lib/bedrock-credits');
 
 const configPath = process.argv[2] || path.join(__dirname, 'config.json');
 const fallbackPath = path.join(__dirname, 'config.example.json');
@@ -258,14 +259,19 @@ async function main() {
     testOpenAI(config.openai),
     testGrok(config.grok || config.groq),
     testAnthropic(config.anthropic),
-    testGoogleCloud(config.googleCloud)
+    testGoogleCloud(config.googleCloud),
+    config.bedrock?.enabled
+      ? fetchBedrockCredits(config.bedrock)
+      : Promise.resolve(null)
   ]);
+
+  const activeResults = results.filter(Boolean);
 
   console.log("┌──────────────┬─────────┬───────────────────┬───────────────────┬──────────────┐");
   console.log("│ Provider     │ Status  │ Primary Detail    │ Sub Detail        │ Gauge        │");
   console.log("├──────────────┼─────────┼───────────────────┼───────────────────┼──────────────┤");
 
-  for (const r of results) {
+  for (const r of activeResults) {
     const name = r.name.padEnd(12);
     const detail = (r.detail || "").padEnd(17).slice(0, 17);
     const sub = (r.sub || "").padEnd(17).slice(0, 17);
