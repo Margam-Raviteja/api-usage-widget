@@ -194,8 +194,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             loaded.size = NSSize(width: 16, height: 16)
         }
 
-        // grok, groq, openrouter, and openai are monochrome; set template so they adapt to dark/light menu bar
-        if name == "grok" || name == "groq" || name == "openrouter" || name == "openai" {
+        // Transparent monochrome glyphs adapt automatically to light/dark menu bars.
+        if name == "grok" || name == "groq" || name == "openrouter" || name == "openai" || name == "bedrock" {
             loaded.isTemplate = true
         } else {
             loaded.isTemplate = false // Keep DeepSeek blue, Google Cloud multi-color, Anthropic terracotta
